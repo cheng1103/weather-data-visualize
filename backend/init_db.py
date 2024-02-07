@@ -4,7 +4,7 @@ from requests.packages.urllib3.util.retry import Retry
 from fake_useragent import UserAgent
 from lxml import etree
 from models import *
-from database import SqlOperate
+from backend.database import SqlOperate
 import configparser
 import json
 
@@ -117,7 +117,7 @@ class InitializationDatabase():
         syntax = """CREATE TABLE IF NOT EXISTS "data_realtime" (
             "id"	TEXT, -- 測站代碼
             "name"	TEXT, -- 測站名稱
-            "time"	TEXT, -- 時間
+            "obs_time"	TEXT, -- 時間
             "Precp"	REAL, -- 降雨量
             "WD"	REAL, -- 風向
             "WS"	REAL, -- 風速
@@ -162,7 +162,7 @@ class InitializationDatabase():
                 realtime_obs.append({
                     'id': item['StationId'],
                     'name': item['StationName'],
-                    'time': item['ObsTime']['DateTime'],
+                    'obs_time': item['ObsTime']['DateTime'],
                     'Precp': rainfall,
                     'WD': weather_element['WindDirection'],
                     'WS': weather_element['WindSpeed'],
@@ -180,6 +180,6 @@ class InitializationDatabase():
         self.build_realtime_obs()
 
 
-if __name__ == "__main__":
-    initialization_database = InitializationDatabase()
-    initialization_database.main()
+# if __name__ == "__main__":
+#     initialization_database = InitializationDatabase()
+#     initialization_database.main()

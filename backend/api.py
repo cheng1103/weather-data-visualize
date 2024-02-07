@@ -12,10 +12,11 @@ async def root():
 
 
 @app.get("/realtime")  # 指定 api 路徑 (get方法)
-async def realtime_weather():
+async def weather_realtime():
     syntax = """
-        SELECT *
-        FROM data_realtime
+        SELECT s.id, s.name, s.alt, s.lng, s.lat, r.obs_time, r.Precp, r.WD, r.WS, r.Temperature, r.RH, r.UVI
+        FROM station_list s JOIN data_realtime r
+        ON s.id = r.id
     """
     data = sql_operate.query(syntax)
     return {"data": data}
