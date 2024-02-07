@@ -1,8 +1,9 @@
 from typing import Optional
 from fastapi import FastAPI
-from backend.database import SqlOperate
+from backend.database import *
 
 sql_operate = SqlOperate()
+data_pipeline = DataPipeline()
 app = FastAPI()  # 建立一個 Fast API application
 
 
@@ -20,3 +21,8 @@ async def weather_realtime():
     """
     data = sql_operate.query(syntax)
     return {"data": data}
+
+@app.post("/realtime")  # 指定 api 路徑 (get方法)
+async def weather_realtime_refresh():
+    data_pipeline.crawler_realtime_obs()
+    return {"message": "Refresh successful!"}
