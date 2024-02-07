@@ -77,7 +77,7 @@ class SqlOperate:
 
 
 '''
-初始化資料庫
+資料處理
 '''
 
 
@@ -100,16 +100,17 @@ class DataPipeline():
 
     # 建立並爬取觀測站清單
     def build_station_list(self):
-        syntax = """CREATE TABLE IF NOT EXISTS "station_list" (
-            "id"	TEXT, -- 測站代碼
-            "name"	TEXT, -- 測站名稱
-            "alt"	REAL, -- 海拔高度
-            "lng"	REAL, -- 經度
-            "lat"	REAL, -- 緯度
-            "county"	TEXT, -- 縣市
-            "addr"	TEXT, -- 地址
-            PRIMARY KEY("id")
-        );
+        syntax = """
+            CREATE TABLE IF NOT EXISTS "station_list" (
+                "id"	TEXT, -- 測站代碼
+                "name"	TEXT, -- 測站名稱
+                "alt"	REAL, -- 海拔高度
+                "lng"	REAL, -- 經度
+                "lat"	REAL, -- 緯度
+                "county"	TEXT, -- 縣市
+                "addr"	TEXT, -- 地址
+                PRIMARY KEY("id")
+            );
         """
         self.sql_operate.create_table(syntax)
 
@@ -179,26 +180,27 @@ class DataPipeline():
 
     # 建立即時觀測資料表
     def build_realtime_obs(self):
-        syntax = """CREATE TABLE IF NOT EXISTS "data_realtime" (
-            "id"	TEXT, -- 測站代碼
-            "name"	TEXT, -- 測站名稱
-            "obs_time"	TEXT, -- 時間
-            "Precp"	REAL, -- 降雨量
-            "WD"	REAL, -- 風向
-            "WS"	REAL, -- 風速
-            "Temperature"	REAL, -- 氣溫
-            "RH"	INTEGER, -- 相對溼度
-            "UVI"	REAL, -- 紫外線
-            PRIMARY KEY("id")
-        );
-            """
+        syntax = """
+            CREATE TABLE IF NOT EXISTS "data_realtime" (
+                "id"	TEXT, -- 測站代碼
+                "name"	TEXT, -- 測站名稱
+                "obs_time"	TEXT, -- 時間
+                "Precp"	REAL, -- 降雨量
+                "WD"	REAL, -- 風向
+                "WS"	REAL, -- 風速
+                "Temperature"	REAL, -- 氣溫
+                "RH"	INTEGER, -- 相對溼度
+                "UVI"	REAL, -- 紫外線
+                PRIMARY KEY("id")
+            );
+        """
         self.sql_operate.create_table(syntax)
 
     # 爬取並寫入即時觀測資料
     def crawler_realtime_obs(self):
 
         # 查詢所有測站代號
-        syntax = """select id, name from station_list"""
+        syntax = """SELECT id, name FROM station_list"""
         station_list = self.sql_operate.query(syntax)
 
         stations = ''
@@ -242,8 +244,17 @@ class DataPipeline():
             # 寫入資料庫
             self.sql_operate.upsert(DataRealtime, realtime_obs)
 
-    # 主程式
+    # 初始化資料庫
     def init_db(self):
-        self.build_station_list()
-        self.build_realtime_obs()
-        self.crawler_realtime_obs()
+        try:
+            syntax = """SELECT *
+            FROM station_list
+            LIMIT 1
+            """
+            self.sql_operate.query(syntax)
+            self.crawler_realtime_obs()
+
+        except:
+            self.build_station_list()
+            self.build_realtime_obs()
+            self.crawler_realtime_obs()
