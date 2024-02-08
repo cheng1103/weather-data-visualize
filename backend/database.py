@@ -76,12 +76,11 @@ class SqlOperate:
                 print(e)
 
 
-'''
-資料處理
-'''
-
-
 class DataPipeline():
+    '''
+    資料處理
+    '''
+
     def __init__(self) -> None:
         self.sql_operate = SqlOperate()
 
@@ -105,7 +104,7 @@ class DataPipeline():
                 "id"	TEXT, -- 測站代碼
                 "name"	TEXT, -- 測站名稱
                 "alt"	REAL, -- 海拔高度
-                "lng"	REAL, -- 經度
+                "lon"	REAL, -- 經度
                 "lat"	REAL, -- 緯度
                 "county"	TEXT, -- 縣市
                 "addr"	TEXT, -- 地址
@@ -170,7 +169,7 @@ class DataPipeline():
                     station_list.append({'id': station_id_list[idx],
                                          'name': station_name_list[idx],
                                          'alt': station_alt_list[idx],
-                                         'lng': station_lng_list[idx],
+                                         'lon': station_lng_list[idx],
                                          'lat': station_lat_list[idx],
                                          'county': station_county_list[idx],
                                          'addr': station_addr_list[idx]
@@ -244,12 +243,13 @@ class DataPipeline():
             # 寫入資料庫
             self.sql_operate.upsert(DataRealtime, realtime_obs)
 
-    # 初始化資料庫
-    def init_db(self):
+    # 初始化或更新資料庫
+    def init_refresh_db(self):
         try:
-            syntax = """SELECT *
-            FROM station_list
-            LIMIT 1
+            syntax = """
+                SELECT *
+                FROM station_list
+                LIMIT 1
             """
             self.sql_operate.query(syntax)
             self.crawler_realtime_obs()
