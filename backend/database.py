@@ -2,14 +2,14 @@ from tqdm import tqdm
 from sqlalchemy import create_engine, text
 from sqlalchemy.dialects import sqlite
 from sqlalchemy.orm import Session, sessionmaker
+from .models import *
 import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from fake_useragent import UserAgent
 from lxml import etree
-from models import *
 import configparser
-import json
+import datetime
 
 
 class SqlOperate:
@@ -42,6 +42,9 @@ class SqlOperate:
 
     # 新增或更新資料
     def upsert(self, table, data, batch_size=10000):
+        # 取得資料表名稱
+        tablename = table.__tablename__
+
         # 取得主鍵
         primary_key_columns = [
             column.name for column in table.__table__.columns if column.primary_key]
@@ -63,7 +66,7 @@ class SqlOperate:
             session.begin()
 
             try:
-                for batch_data in tqdm(batches, desc='資料寫入進度'):
+                for batch_data in tqdm(batches, desc=f'資料表 {tablename} 寫入進度'):
                     insert_stmt = sqlite.insert(table).values(batch_data)
                     on_conflict_stmt = insert_stmt.on_conflict_do_update(
                         index_elements=primary_key_columns, set_=set_dict)
@@ -183,7 +186,7 @@ class DataPipeline():
             CREATE TABLE IF NOT EXISTS "data_realtime" (
                 "id"	TEXT, -- 測站代碼
                 "name"	TEXT, -- 測站名稱
-                "obs_time"	TEXT, -- 時間
+                "obs_time"	INTEGER, -- 時間
                 "Precp"	REAL, -- 降雨量
                 "WD"	REAL, -- 風向
                 "WS"	REAL, -- 風速
@@ -221,17 +224,22 @@ class DataPipeline():
 
                 weather_element = item['WeatherElement']
 
-                # 整理資料
+                # 整理降雨資料
                 rainfall = weather_element['Now']['Precipitation']
                 if type(rainfall) != float:
                     rainfall = 0.05
                 elif rainfall < 0:
                     rainfall = 0
 
+                # 轉換時間格式
+                obs_time = datetime.datetime.strptime(
+                    item['ObsTime']['DateTime'], "%Y-%m-%dT%H:%M:%S%z").timestamp()
+                obs_time = int(obs_time)
+
                 realtime_obs.append({
                     'id': item['StationId'],
                     'name': item['StationName'],
-                    'obs_time': item['ObsTime']['DateTime'],
+                    'obs_time': obs_time,
                     'Precp': rainfall,
                     'WD': weather_element['WindDirection'],
                     'WS': weather_element['WindSpeed'],
