@@ -280,7 +280,7 @@ class DataPipeline():
                 'UVI': weather_element['UVIndex']
             }
         # 使用多線程處理資料
-        process_result = self.multitasking(extract_realtime_obs, data)
+        process_result = self.__multitasking(extract_realtime_obs, data)
 
         # 寫入資料庫
         self.sql_operate.upsert(DataRealtime, process_result)
