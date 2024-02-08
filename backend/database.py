@@ -14,6 +14,8 @@ from lxml import etree
 import configparser
 import datetime
 import arrow
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 
 class SqlOperate:
@@ -103,6 +105,24 @@ class DataPipeline():
         self.session.mount('http://', adapter)
         self.session.mount('https://', adapter)
         self.session.keep_alive = False
+
+    """
+    使用多線程處理資料
+
+    Args:
+    - task: 處理每個資料項目的函式
+    - data: 要處理的資料列表
+    - max_workers: 同時運行的最大執行緒數量
+
+    Returns:
+    - 處理完成的結果列表
+    """
+    # 多工處理
+
+    def __multitasking(self, task, data,  max_workers=4):
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(task, item) for item in data]
+            return [future.result() for future in futures]
 
     # 發送請求(GET方法)
     def __web_requests_get(self, url, headers=None):
@@ -230,9 +250,9 @@ class DataPipeline():
         response = self.__web_requests_get(url)
 
         data = response.json()['records']['Station']
-        realtime_obs = []
 
-        for item in data:
+        # 轉換並整理資料
+        def extract_realtime_obs(item):
 
             weather_element = item['WeatherElement']
 
@@ -248,7 +268,7 @@ class DataPipeline():
                 item['ObsTime']['DateTime'], "%Y-%m-%dT%H:%M:%S%z").timestamp()
             obs_time = int(obs_time)
 
-            realtime_obs.append({
+            return {
                 'sID': item['StationId'],
                 'name': item['StationName'],
                 'obs_time': obs_time,
@@ -258,10 +278,12 @@ class DataPipeline():
                 'Temperature': weather_element['AirTemperature'],
                 'RH': weather_element['RelativeHumidity'],
                 'UVI': weather_element['UVIndex']
-            })
+            }
+        # 使用多線程處理資料
+        process_result = self.multitasking(extract_realtime_obs, data)
 
         # 寫入資料庫
-        self.sql_operate.upsert(DataRealtime, realtime_obs)
+        self.sql_operate.upsert(DataRealtime, process_result)
 
     # 建立歷史觀測資料表
     def build_history_obs(self):
