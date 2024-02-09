@@ -100,7 +100,7 @@ class DataPipeline():
 
         # 初始化連線物件
         self.session = requests.Session()
-        retry = Retry(total=3, backoff_factor=1,
+        retry = Retry(total=5, backoff_factor=1,
                       allowed_methods=frozenset(['GET', 'POST']))
         adapter = HTTPAdapter(max_retries=retry)
         self.session.mount('http://', adapter)
@@ -126,14 +126,16 @@ class DataPipeline():
             return [future.result() for future in futures]
 
     # 發送請求(GET方法)
-    def __web_requests_get(self, url, headers=None):
+    def __web_requests_get(self, url, headers=None, params=None):
 
-        response = self.session.get(url, headers=headers, timeout=5)
+        response = self.session.get(
+            url, headers=headers, params=params, timeout=5)
 
         while response.status_code != requests.codes.ok:
-            t = random.uniform(0.5, 2.5)
+            t = random.uniform(0.05, 2.5)
             time.sleep(t)
-            response = self.session.get(url, headers=headers, timeout=5)
+            response = self.session.get(
+                url, headers=headers, params=params, timeout=5)
 
         self.session.close()
 
@@ -178,7 +180,7 @@ class DataPipeline():
         }
 
         # 爬取資料
-        response = self.__web_requests_get(url, headers)
+        response = self.__web_requests_get(url, headers=headers)
         response.encoding = 'utf-8'
         dom = etree.HTML(response.text, etree.HTMLParser())
 
@@ -246,9 +248,17 @@ class DataPipeline():
 
         stations = stations[1:]
 
+        # 建構請求資料
+        params = {
+            'Authorization': self.cwa_authorization,
+            'StationId': stations,
+            'WeatherElement': 'Now,WindDirection,WindSpeed,AirTemperature,RelativeHumidity,UVIndex',
+            'GeoInfo': 'Coordinates'
+        }
+
         # 爬取資料
-        url = f'https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001?Authorization={self.cwa_authorization}&StationId={stations}&WeatherElement=Now,WindDirection,WindSpeed,AirTemperature,RelativeHumidity,UVIndex&GeoInfo=Coordinates'
-        response = self.__web_requests_get(url)
+        url = 'https://opendata.cwa.gov.tw/api/v1/rest/datastore/O-A0003-001'
+        response = self.__web_requests_get(url, params=params)
 
         data = response.json()['records']['Station']
 
