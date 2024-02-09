@@ -100,7 +100,8 @@ class DataPipeline():
 
         # 初始化連線物件
         self.session = requests.Session()
-        retry = Retry(total=2, backoff_factor=1)
+        retry = Retry(total=3, backoff_factor=1,
+                      allowed_methods=frozenset(['GET', 'POST']))
         adapter = HTTPAdapter(max_retries=retry)
         self.session.mount('http://', adapter)
         self.session.mount('https://', adapter)
@@ -361,10 +362,11 @@ class DataPipeline():
             'X-Requested-With': 'XMLHttpRequest'
         }
 
-        response = requests.post(url, headers=headers, data=data, timeout=5)
+        response = self.session.post(
+            url, headers=headers, data=data, timeout=5)
 
         while response.status_code != response.json()['code']:
-            response = requests.post(
+            response = self.session.post(
                 url, headers=headers, data=data, timeout=5)
 
         data = response.json()['data'][0]['dts']
