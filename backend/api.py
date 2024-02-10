@@ -17,7 +17,7 @@ async def root():
 # 回傳觀測資料
 async def weather_realtime():
     syntax = """
-        SELECT s.sID, s.name, s.alt, s.lon, s.lat, r.obs_time, r.Precp, r.WD, r.WS, r.Temperature, r.RH, r.UVI
+        SELECT s.sID, s.stn_name, s.alt, s.lon, s.lat, r.obs_time, r.Precp, r.WD, r.WS, r.Temperature, r.RH, r.UVI
         FROM station_list s JOIN data_realtime r
         ON s.sID = r.sID
     """

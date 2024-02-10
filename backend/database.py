@@ -120,10 +120,14 @@ class DataPipeline():
     """
     # 多工處理
 
-    def __multitasking(self, task, data,  max_workers=4):
+    def __multi_thread_task(self, task, data,  max_workers=4):
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # 提交資料處理工作
             futures = [executor.submit(task, item) for item in data]
-            return [future.result() for future in futures]
+            # 等待所有工作完成
+            results = [future.result() for future in futures]
+
+            return results
 
     # 發送請求(GET方法)
     def __web_requests_get(self, url, headers=None, params=None):
@@ -146,7 +150,7 @@ class DataPipeline():
         syntax = """
             CREATE TABLE IF NOT EXISTS "station_list" (
                 "sID"	TEXT, -- 測站代碼
-                "name"	TEXT, -- 測站名稱
+                "stn_name"	TEXT, -- 測站名稱
                 "alt"	REAL, -- 海拔高度
                 "lon"	REAL, -- 經度
                 "lat"	REAL, -- 緯度
@@ -207,7 +211,7 @@ class DataPipeline():
         for idx in range(len(station_type_list)):
             if '署屬有人站' == station_type_list[idx] and '雷達' not in station_name_list[idx]:
                 station_list.append({'sID': station_id_list[idx],
-                                    'name': station_name_list[idx],
+                                    'stn_name': station_name_list[idx],
                                      'alt': station_alt_list[idx],
                                      'lon': station_lng_list[idx],
                                      'lat': station_lat_list[idx],
@@ -222,7 +226,7 @@ class DataPipeline():
         syntax = """
             CREATE TABLE IF NOT EXISTS "data_realtime" (
                 "sID"	TEXT, -- 測站代碼
-                "name"	TEXT, -- 測站名稱
+                "stn_name"	TEXT, -- 測站名稱
                 "obs_time"	INTEGER, -- 時間
                 "Precp"	REAL, -- 降雨量
                 "WD"	REAL, -- 風向
@@ -239,7 +243,7 @@ class DataPipeline():
     def crawler_realtime_obs(self):
 
         # 查詢所有測站代號
-        syntax = """SELECT sID, name FROM station_list"""
+        syntax = """SELECT sID, stn_name FROM station_list"""
         station_list = self.sql_operate.query(syntax)
 
         stations = ''
@@ -281,7 +285,7 @@ class DataPipeline():
 
             return {
                 'sID': item['StationId'],
-                'name': item['StationName'],
+                'stn_name': item['StationName'],
                 'obs_time': obs_time,
                 'Precp': rainfall,
                 'WD': weather_element['WindDirection'],
@@ -291,7 +295,7 @@ class DataPipeline():
                 'UVI': weather_element['UVIndex']
             }
         # 使用多線程處理資料
-        process_result = self.__multitasking(extract_realtime_obs, data)
+        process_result = self.__multi_thread_task(extract_realtime_obs, data)
 
         # 寫入資料庫
         self.sql_operate.upsert(DataRealtime, process_result)
@@ -301,25 +305,25 @@ class DataPipeline():
         syntax = """
             CREATE TABLE IF NOT EXISTS "data_history" (
                 "sID"	TEXT, -- 測站代碼
-                "name"	TEXT, -- 測站名稱
+                "stn_name"	TEXT, -- 測站名稱
                 "obs_date"	INTEGER, -- 資料日期
+                "StnPres"	REAL, -- 測站氣壓
+                "SeaPres"	REAL, -- 海平面氣壓
                 "Temperature"	REAL, -- 氣溫
                 "Tmax"	REAL, -- 最高氣溫
                 "Tmin"	REAL, -- 最低氣溫
-                "Precp"	REAL, -- 降雨量
-                "PrecpHour"	REAL, -- 降雨時數 
                 "RH"	REAL, -- 相對溼度
-                "StnPres"	REAL, -- 測站氣壓
-                "SeaPres"	REAL, -- 海平面氣壓
                 "WS"	REAL, -- 風速
                 "WD"	INTEGER, -- 風向
                 "WSmax"	REAL, -- 最大風速
                 "WDmax"	INTEGER, -- 最大風向
-                "CloudAmount"	REAL, -- 總雲量
+                "Precp"	REAL, -- 降雨量
+                "PrecpHour"	REAL, -- 降雨時數 
                 "SunShineHour"	REAL, -- 日照時數
                 "SunshineRate"	REAL, -- 日照率
                 "GloblRad"	REAL, -- 全天空日射量
-                "UVImax"	INTEGER, -- 最大紫外線
+                "UVImax"	REAL, -- 最大紫外線
+                "CloudAmount"	REAL, -- 總雲量
                 PRIMARY KEY("sID","obs_date")
             );
         """
@@ -408,5 +412,6 @@ class DataPipeline():
 
             self.build_station_list()
             self.build_realtime_obs()
-            self.build_history_obs()
             self.crawler_realtime_obs()
+            self.build_history_obs()
+
