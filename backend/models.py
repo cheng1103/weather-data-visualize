@@ -27,6 +27,7 @@ class DataHistory(Base):
     SunShineHour = Column(Float)
     SunshineRate = Column(Float)
     GloblRad = Column(Float)
+    VisbMean = Column(Float)
     UVImax = Column(Float)
     CloudAmount = Column(Float)
 
