@@ -318,7 +318,8 @@ class DataPipeline():
                 'UVI': weather_element['UVIndex']
             }
         # 使用多線程處理資料
-        process_result = self.__multi_thread_task(extract_realtime_obs, data)
+        process_result = self.__multi_thread_task(
+            extract_realtime_obs, data, desc='資料整理進度')
 
         # 寫入資料庫
         self.sql_operate.upsert(DataRealtime, process_result)
@@ -454,6 +455,14 @@ class DataPipeline():
                     piece['DataDate'], "%Y-%m-%dT%H:%M:%S").timestamp()
                 obs_date = int(obs_date)
 
+                # 整理氣壓相關資料：儀器故障的部分改為None
+                stn_pres = piece['StationPressure']['Mean']  # 測站氣壓
+                sea_pres = piece['SeaLevelPressure']['Mean']  # 海平面氣壓
+                if stn_pres < 0:
+                    stn_pres = None
+                if sea_pres < 0:
+                    sea_pres = None
+
                 # 整理氣溫相關資料：儀器故障的部分改為None
                 t_max = piece['AirTemperature']['Maximum']  # 最高氣溫
                 t_min = piece['AirTemperature']['Minimum']  # 最低氣溫
@@ -476,7 +485,7 @@ class DataPipeline():
                 if wd_max < 0:
                     wd_max = None
 
-                # 整理雨量資料：轉換雨跡、降雨時數故障紀錄的部分改為None
+                # 整理雨量相關資料：轉換雨跡、降雨時數故障紀錄的部分改為None
                 rainfall = piece['Precipitation']['Accumulation']  # 當日降雨量
                 # 降雨時數
                 rainfall_length = piece['PrecipitationDuration']['Total']
@@ -488,22 +497,33 @@ class DataPipeline():
                 # 整理日照資料：儀器故障的部分改為None
                 sunshine_hour = piece['SunshineDuration']['Total']  # 日照時數
                 sunshine_rate = piece['SunshineDuration']['Rate']  # 日照率
+                # 全天空日射量
+                globl_rad = piece['GlobalSolarRadiation']['Accumulation']
                 if sunshine_hour < 0:
                     sunshine_hour = None
                 if sunshine_rate < 0:
                     sunshine_rate = None
+                if globl_rad < 0:
+                    globl_rad = None
 
                 # 整理最大紫外線資料：儀器故障的部分改為None
-                uvi_max = piece['UVIndex']['Maximum']  # 最大紫外線
-                if uvi_max < 0:
-                    uvi_max = None
+                uvi_max = piece['UVIndex']['Maximum']
+                if uvi_max != None:
+                    if uvi_max < 0:
+                        uvi_max = None
+
+                # 整理總雲量資料：因濃霧無法觀察，定義為11
+                cloud_amount = piece['TotalCloudAmount']['Mean']
+                if cloud_amount != None:
+                    if cloud_amount < 0:
+                        cloud_amount = 11
 
                 histroy_obs.append({
                     'sID': stn_id,
                     'stn_name': stn_name,
                     'obs_date': obs_date,
-                    'StnPres': piece['StationPressure']['Mean'],  # 測站氣壓
-                    'SeaPres': piece['SeaLevelPressure']['Mean'],  # 海平面氣壓
+                    'StnPres': stn_pres,  # 測站氣壓
+                    'SeaPres': sea_pres,  # 海平面氣壓
                     'Temperature': piece['AirTemperature']['Mean'],  # 氣溫
                     'Tmax': t_max,  # 最高氣溫
                     'Tmin': t_min,  # 最低氣溫
@@ -516,11 +536,10 @@ class DataPipeline():
                     'PrecpHour': rainfall_length,  # 降雨時數
                     'SunShineHour': sunshine_hour,  # 日照時數
                     'SunshineRate': sunshine_rate,  # 日照率
-                    # 全天空日射量
-                    'GloblRad': piece['GlobalSolarRadiation']['Accumulation'],
+                    'GloblRad': globl_rad,  # 全天空日射量
                     'VisbMean': piece['Visibility']['Mean'],  # 能見度
-                    'UVImax': piece['UVIndex']['Maximum'],  # 最大紫外線
-                    'CloudAmount': piece['TotalCloudAmount']['Mean']  # 總雲量
+                    'UVImax': uvi_max,  # 最大紫外線
+                    'CloudAmount': cloud_amount  # 總雲量
                 })
 
             return histroy_obs
@@ -534,27 +553,35 @@ class DataPipeline():
             web_requests_post, requests_list, desc='歷史觀測資料爬取進度')
 
         # 使用多線程處理資料
-        data_bunchs = self.__multi_thread_task(extract_history_obs, data_list)
+        data_bunchs = self.__multi_thread_task(
+            extract_history_obs, data_list, desc='資料整理進度')
         # 將多個list合併為一串列
         data = [element for item in data_bunchs for element in item]
 
-        return data
+        # 按測站代號升序，再日期升序
+        data = sorted(data, key=lambda item: (item['sID']))
+        data = sorted(data, key=lambda item: (item['obs_date']))
+
+        # 寫入資料庫
+        self.sql_operate.upsert(DataHistory, data)
 
     # 初始化或更新資料庫
     def init_refresh_db(self):
         # 更新
         try:
-            et = arrow.now().shift(days=-1).floor("day")  # 取得當前時間
-            st = et.shift(days=-30).floor("day")  # 取得一個月前時間
+            # 取得資料庫最新資料的日期
+            syntax = """SELECT obs_date FROM data_history ORDER BY obs_date DESC LIMIT 1"""
+            st = self.sql_operate.query(syntax)[0]['obs_date']
+            st = datetime.datetime.fromtimestamp(
+                st).strftime('%Y-%m-%dT%H:%M:%S')
+
+            # 取得前一日時間
+            et = arrow.now().shift(days=-1).floor("day")
             et = str(et).replace("+08:00", "")
-            st = str(st).replace("+08:00", "")
-            syntax = """
-                SELECT *
-                FROM station_list
-                LIMIT 1
-            """
-            self.sql_operate.query(syntax)
+
+            # 更新所有資料
             self.crawler_realtime_obs()
+            self.crawler_history_obs(st, et)
 
         # 初始化
         except:
@@ -567,3 +594,4 @@ class DataPipeline():
             self.build_realtime_obs()
             self.crawler_realtime_obs()
             self.build_history_obs()
+            self.crawler_history_obs(st, et)
