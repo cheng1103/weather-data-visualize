@@ -15,7 +15,7 @@ async def root():
 
 @app.get("/realtime")
 # 回傳觀測資料
-async def weather_realtime():
+async def weather_data_realtime():
     syntax = """
         SELECT s.sID, s.stn_name, s.alt, s.lon, s.lat, r.obs_time, r.Precp, r.WD, r.WS, r.Temperature, r.RH, r.UVI
         FROM station_list s JOIN data_realtime r
@@ -27,6 +27,25 @@ async def weather_realtime():
 
 @app.post("/realtime")
 # 更新目前觀測資料
-async def weather_realtime_refresh():
+async def weather_realtime_data_refresh():
     data_pipeline.crawler_realtime_obs()
     return {"message": "Refresh successful!"}
+
+
+@app.get("/history")
+# 回傳歷史資料
+async def weather_data_history(stn: str, start: int, end: int):
+    syntax = """
+        SELECT s.sID, s.stn_name, s.alt, s.lon, s.lat, h.obs_date, h.Precp, h.WD, h.WS, h.Temperature, h.RH, h.UVImax
+        FROM station_list s JOIN data_history h
+        ON s.sID = h.sID
+        WHERE h.stn_name = :stn
+        AND h."obs_date" BETWEEN :start AND :end
+    """
+    syntax_params = {
+        'stn': stn,
+        'start': start,
+        'end': end,
+    }
+    data = sql_operate.api_query(syntax, syntax_params)
+    return {"data": data}
