@@ -40,6 +40,17 @@ class SqlOperate:
 
         return query_result
 
+    # 查詢資料(API)
+    def api_query(self, syntax, syntax_params_dict):
+        with Session(self.sqlite_engine) as session:
+            query_result = session.execute(text(syntax), syntax_params_dict)
+            query_data = query_result.fetchall()
+            query_column_names = query_result.keys()
+
+            result = [dict(zip(query_column_names, row)) for row in query_data]
+
+        return result
+
     # 建立表格
     def create_table(self, syntax):
         with Session(self.sqlite_engine) as session:
