@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 
-class SqlOperate:
+class SQLOperate:
     '''
     資料庫操作
     '''
@@ -60,7 +60,7 @@ class SqlOperate:
             print(f'資料表 {table_name} 建立成功！')
 
     # 新增或更新資料
-    def upsert(self, table, data, batch_size=10000):
+    def upsert(self, table, data, batch_size=1000):
         # 取得資料表名稱
         tablename = table.__tablename__
 
@@ -70,7 +70,7 @@ class SqlOperate:
 
         # 取得更新資料的欄位
         set_dict = {}
-        for key, value in data[0].items():
+        for key in data[0].keys():
             if key not in primary_key_columns:
                 set_dict[key] = getattr(sqlite.insert(table).excluded, key)
 
@@ -98,13 +98,13 @@ class SqlOperate:
                 print(e)
 
 
-class DataPipeline():
+class DataPipeline:
     '''
     資料處理
     '''
 
     def __init__(self) -> None:
-        self.sql_operate = SqlOperate()
+        self.sql_operate = SQLOperate()
 
         # 讀取授權碼
         config = configparser.ConfigParser()
@@ -113,7 +113,7 @@ class DataPipeline():
 
         # 初始化連線物件
         self.session = requests.Session()
-        retry = Retry(total=5, backoff_factor=2,
+        retry = Retry(total=5, backoff_factor=3,
                       allowed_methods=frozenset(['GET', 'POST']))
         adapter = HTTPAdapter(max_retries=retry)
         self.session.mount('http://', adapter)
@@ -121,7 +121,7 @@ class DataPipeline():
         self.session.keep_alive = False
 
     # 暫停
-    def __pause(self, min_sec=0.5, max_sec=2.5):
+    def __pause(self, min_sec=0.5, max_sec=5):
         t = random.uniform(min_sec, max_sec)
         time.sleep(t)
 
@@ -179,7 +179,7 @@ class DataPipeline():
 
         return response
 
-    # 建立並爬取觀測站清單
+    # 建立觀測站清單
     def build_station_list(self):
         syntax = """
             CREATE TABLE IF NOT EXISTS "station_list" (
@@ -190,68 +190,75 @@ class DataPipeline():
                 "lat"	REAL, -- 緯度
                 "county"	TEXT, -- 縣市
                 "addr"	TEXT, -- 地址
+                "start_date" TEXT, -- 設站日期
+                "end_date" TEXT, -- 撤站日期
+                "remark" TEXT, -- 備註
+                "state" INTEGER, -- 狀態
                 PRIMARY KEY("sID")
             );
         """
         self.sql_operate.create_table(syntax)
 
+    # 更新現有觀測站清單
+    def refresh_station_list(self):
         # 建構請求資料
-        url = 'https://e-service.cwa.gov.tw/wdps/obs/state.htm'
+        url = 'https://codis.cwa.gov.tw/api/station_list'
         useragent = UserAgent().random
         headers = {
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept': '*/*',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
             'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Cache-Control': 'max-age=0',
             'Connection': 'keep-alive',
             'Dnt': '1',
-            'Host': 'e-service.cwa.gov.tw',
-            'Sec-Ch-Ua': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+            'Host': 'codis.cwa.gov.tw',
+            'Referer': 'https://codis.cwa.gov.tw/StationData',
+            'Sec-Ch-Ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
             'Sec-Ch-Ua-Mobile': '?0',
             'Sec-Ch-Ua-Platform': '"Windows"',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'same-site',
-            'Sec-Fetch-User': '?1',
-            'Upgrade-Insecure-Requests': '1',
-            'User-Agent': useragent
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'User-Agent': useragent,
+            'X-Requested-With': 'XMLHttpRequest'
         }
 
         # 爬取資料
         response = self.__web_requests_get(url, headers=headers)
-        response.encoding = 'utf-8'
-        dom = etree.HTML(response.text, etree.HTMLParser())
+        data = response.json()['data'][2]['item']
 
         station_list = []
 
-        station_type_list = dom.xpath(
-            '//*[@id="existing_station"]/table/tr/td[3]/text()')  # 型式
-        station_id_list = dom.xpath(
-            '//*[@id="existing_station"]/table/tr/td[1]/text()')  # 站號
-        station_name_list = dom.xpath(
-            '//*[@id="existing_station"]/table/tr/td[2]/text()')  # 站名
-        station_alt_list = dom.xpath(
-            '//*[@id="existing_station"]/table/tr/td[4]/text()')  # 海拔高度
-        station_lng_list = dom.xpath(
-            '//*[@id="existing_station"]/table/tr/td[5]/text()')  # 經度
-        station_lat_list = dom.xpath(
-            '//*[@id="existing_station"]/table/tr/td[6]/text()')  # 緯度
-        station_county_list = dom.xpath(
-            '//*[@id="existing_station"]/table/tr/td[7]/text()')  # 縣市
-        station_addr_list = dom.xpath(
-            '//*[@id="existing_station"]/table/tr/td[8]/text()')  # 地址
+        for item in data:
+            if '雷達' not in item['stationName'] and len(item['address']) != 0:
 
-        # 整理資料
-        for idx in range(len(station_type_list)):
-            if '署屬有人站' == station_type_list[idx] and '雷達' not in station_name_list[idx]:
-                station_list.append({'sID': station_id_list[idx],
-                                     'stn_name': station_name_list[idx],
-                                     'alt': station_alt_list[idx],
-                                     'lon': station_lng_list[idx],
-                                     'lat': station_lat_list[idx],
-                                     'county': station_county_list[idx],
-                                     'addr': station_addr_list[idx]
-                                     })
+                # 整理備註，若未填寫備註，則為None
+                if len(item['webRemark']) != 0:
+                    remark = item['webRemark']
+                else:
+                    remark = None
+
+                # 整理撤站日期，若未撤站，則為撤站日期為None、state為1
+                if len(item['stationEndDate']) == 0:
+                    end_date = None
+                    state = 1
+                else:
+                    end_date = item['stationEndDate']
+                    state = 0
+
+                station_list.append({
+                    'sID': item['stationID'],
+                    'stn_name': item['stationName'],
+                    'alt': item['altitude'],
+                    'lon': item['longitude'],
+                    'lat': item['latitude'],
+                    'county': item['countryName'],
+                    'addr': item['address'],
+                    'start_date': item['stationStartDate'],
+                    'end_date': end_date,
+                    'remark': remark,
+                    'state': state
+                })
+
         # 寫入資料庫
         self.sql_operate.upsert(StationList, station_list)
 
@@ -273,11 +280,15 @@ class DataPipeline():
         """
         self.sql_operate.create_table(syntax)
 
-    # 爬取並寫入即時觀測資料
-    def crawler_realtime_obs(self):
+    # 爬取、並整理和寫入即時觀測資料
+    def etl_realtime_obs(self):
 
-        # 查詢所有測站代號
-        syntax = """SELECT sID, stn_name FROM station_list"""
+        # 查詢現存測站代號
+        syntax = """
+            SELECT sID, stn_name 
+            FROM station_list
+            WHERE state = 1
+        """
         station_list = self.sql_operate.query(syntax)
 
         stations = ''
@@ -301,7 +312,7 @@ class DataPipeline():
         data = response.json()['records']['Station']
 
         # 轉換並整理資料
-        def extract_realtime_obs(item):
+        def transform_realtime_obs(item):
 
             weather_element = item['WeatherElement']
 
@@ -330,7 +341,7 @@ class DataPipeline():
             }
         # 使用多線程處理資料
         process_result = self.__multi_thread_task(
-            extract_realtime_obs, data, desc='資料整理進度')
+            transform_realtime_obs, data, desc='資料整理進度')
 
         # 寫入資料庫
         self.sql_operate.upsert(DataRealtime, process_result)
@@ -365,10 +376,15 @@ class DataPipeline():
         """
         self.sql_operate.create_table(syntax)
 
-    # 爬取所有測站歷史觀測資料
-    def crawler_history_obs(self, start_date, end_date):
+    # 爬取、並整理和寫入所有測站歷史觀測資料
+    def etl_history_obs(self, start_date, end_date):
         # 撈取觀測站清單
         syntax = """SELECT sID, stn_name FROM station_list"""
+        # syntax = """
+        #     SELECT sID, stn_name
+        #     FROM station_list
+        #     WHERE state = 1
+        # """
         station_list = self.sql_operate.query(syntax)
 
         # 建立觀測站代碼轉換表
@@ -378,7 +394,9 @@ class DataPipeline():
 
         # 建構爬蟲所需的標頭與負載訊息
         def requests_params(item, st, et):
-            cm = arrow.now().floor("month")  # 取得當前月份
+            cm = st.floor("month")  # 取得資料起始月份
+            st = str(st.floor("day")).replace("+08:00", "")  # 轉換時間格式
+            et = str(et.floor("day")).replace("+08:00", "")  # 轉換時間格式
 
             # 建構表單資料
             payload = {
@@ -399,7 +417,7 @@ class DataPipeline():
             # 建構標頭
             useragent = UserAgent().random
             headers = {
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
                 'Accept-Encoding': 'gzip, deflate, br',
                 'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
                 'Connection': 'keep-alive',
@@ -430,30 +448,42 @@ class DataPipeline():
             url = f'https://codis.cwa.gov.tw/api/station?'
 
             try:
-                self.__pause(min_sec=0.5)
+                self.__pause(min_sec=0.75)
                 response = self.session.post(
                     url, headers=headers, data=payload, timeout=5)
 
-            except:
-                self.__pause(min_sec=1)
+            except requests.exceptions.Timeout:
+                self.__pause(min_sec=1.5)
                 response = self.session.post(
                     url, headers=headers, data=payload, timeout=5)
 
             finally:
-                while response.status_code != response.json()['code']:
-                    self.__pause(min_sec=1.5)
+                if 'response' in locals():
+                    while response.status_code != response.json()['code']:
+                        self.__pause(min_sec=2)
+                        response = self.session.post(
+                            url, headers=headers, data=payload, timeout=5)
+                else:
+                    self.__pause(min_sec=2)
                     response = self.session.post(
                         url, headers=headers, data=payload, timeout=5)
+                    while response.status_code != response.json()['code']:
+                        self.__pause(min_sec=2)
+                        response = self.session.post(
+                            url, headers=headers, data=payload, timeout=5)
 
             self.session.close()
 
-            data = response.json()['data'][0]
-            data['stn_name'] = stn_name  # 將觀測站站名加入資料中
+            try:
+                data = response.json()['data'][0]
+                data['stn_name'] = stn_name  # 將觀測站站名加入資料中
+            except:
+                data = None
 
             return data
 
         # 轉換並整理資料
-        def extract_history_obs(item):
+        def transform_history_obs(item):
             histroy_obs = []
             stn_id = item['StationID']  # 觀測站代碼
             stn_name = item['stn_name']  # 觀測站名稱
@@ -466,68 +496,83 @@ class DataPipeline():
                     piece['DataDate'], "%Y-%m-%dT%H:%M:%S").timestamp()
                 obs_date = int(obs_date)
 
-                # 整理氣壓相關資料：儀器故障的部分改為None
+                # 整理氣壓相關資料：測站未提供此資料，則為None；儀器故障的部分改為None
                 stn_pres = piece['StationPressure']['Mean']  # 測站氣壓
                 sea_pres = piece['SeaLevelPressure']['Mean']  # 海平面氣壓
-                if stn_pres < 0:
+                if stn_pres == None or stn_pres < 0:
                     stn_pres = None
-                if sea_pres < 0:
+                if sea_pres == None or sea_pres < 0:
                     sea_pres = None
 
-                # 整理氣溫相關資料：儀器故障的部分改為None
-                t_max = piece['AirTemperature']['Maximum']  # 最高氣溫
-                t_min = piece['AirTemperature']['Minimum']  # 最低氣溫
-                if t_max == -99.5:
+                # 整理相對濕度資料：測站未提供此資料，則為None；儀器故障的部分改為None
+                rh = piece['RelativeHumidity']['Mean']
+                if rh == None or rh < 0:
+                    rh = None
+
+                # 整理氣溫相關資料：測站未提供此資料，則為None；儀器故障的部分改為None
+                temperature = piece['AirTemperature']['Mean']  # 單日平均氣溫
+                t_max = piece['AirTemperature']['Maximum']  # 單日最高氣溫
+                t_min = piece['AirTemperature']['Minimum']  # 單日最低氣溫
+                if temperature == None or temperature == -99.5:
+                    temperature = None
+                if t_max == None or t_max == -99.5:
                     t_max = None
-                if t_min == -99.5:
+                if t_max == None or t_min == -99.5:
                     t_min = None
 
-                # 整理風速相關資料：儀器故障的部分改為None
+                # 整理風速相關資料：測站未提供此資料，則為None；儀器故障的部分改為None；風向未定則轉換為0
                 ws = piece['WindSpeed']['Mean']  # 風速
                 wd = piece['WindDirection']['Prevailing']  # 風向
                 ws_max = piece['PeakGust']['Maximum']  # 最大瞬間風速
                 wd_max = piece['PeakGust']['Direction']  # 最大瞬間風向
-                if ws < 0:
+                if ws == None or ws < 0:
                     ws = None
-                if wd < 0:
+                if wd == None or wd < 0:
                     wd = None
-                if ws_max < 0:
+                elif wd > 360:
+                    wd = 0
+                if ws_max == None or ws_max < 0:
                     ws_max = None
-                if wd_max < 0:
+                if wd_max == None or wd_max < 0:
                     wd_max = None
+                elif wd_max > 360:
+                    wd_max = 0
 
-                # 整理雨量相關資料：轉換雨跡、降雨時數故障紀錄的部分改為None
+                # 降雨量：測站未提供此資料，則為None；儀器故障的部分改為None；轉換雨跡
                 rainfall = piece['Precipitation']['Accumulation']  # 當日降雨量
-                # 降雨時數
+                if rainfall != None:
+                    if rainfall == -9.8:
+                        rainfall = 0.05
+                    elif rainfall < 0:
+                        rainfall = None
+                # 降雨時數：測站未提供此資料，則為None；儀器故障的部分改為None
                 rainfall_length = piece['PrecipitationDuration']['Total']
-                if rainfall < 0:
-                    rainfall = 0.25
-                if rainfall_length < 0:
+                if rainfall_length == None or rainfall_length < 0:
                     rainfall_length = None
 
-                # 整理日照資料：儀器故障的部分改為None
+                # 整理日照資料：測站未提供此資料，則為None；儀器故障的部分改為None
                 sunshine_hour = piece['SunshineDuration']['Total']  # 日照時數
                 sunshine_rate = piece['SunshineDuration']['Rate']  # 日照率
-                # 全天空日射量
-                globl_rad = piece['GlobalSolarRadiation']['Accumulation']
-                if sunshine_hour < 0:
+                if sunshine_hour == None or sunshine_hour < 0:
                     sunshine_hour = None
-                if sunshine_rate < 0:
+                if sunshine_rate == None or sunshine_rate < 0:
                     sunshine_rate = None
-                if globl_rad < 0:
+                # 全天空日射量：測站未提供此資料，則為None；儀器故障的部分改為None
+                globl_rad = piece['GlobalSolarRadiation']['Accumulation']
+                if globl_rad == None or globl_rad < 0:
                     globl_rad = None
 
-                # 整理最大紫外線資料：儀器故障的部分改為None
+                # 整理最大紫外線資料：測站未提供此資料，則為None；儀器故障的部分改為None
                 uvi_max = piece['UVIndex']['Maximum']
-                if uvi_max != None:
-                    if uvi_max < 0:
-                        uvi_max = None
+                if uvi_max == None or uvi_max < 0:
+                    uvi_max == None
 
                 # 整理總雲量資料：因濃霧無法觀察，定義為11
                 cloud_amount = piece['TotalCloudAmount']['Mean']
-                if cloud_amount != None:
-                    if cloud_amount < 0:
-                        cloud_amount = 11
+                if cloud_amount == None:
+                    cloud_amount == None
+                elif cloud_amount < 0:
+                    cloud_amount = 11
 
                 histroy_obs.append({
                     'sID': stn_id,
@@ -535,10 +580,10 @@ class DataPipeline():
                     'obs_date': obs_date,
                     'StnPres': stn_pres,  # 測站氣壓
                     'SeaPres': sea_pres,  # 海平面氣壓
-                    'Temperature': piece['AirTemperature']['Mean'],  # 氣溫
+                    'Temperature': temperature,  # 氣溫
                     'Tmax': t_max,  # 最高氣溫
                     'Tmin': t_min,  # 最低氣溫
-                    'RH': piece['RelativeHumidity']['Mean'],  # 相對溼度
+                    'RH': rh,  # 相對溼度
                     'WS': ws,  # 風速
                     'WD': wd,  # 風向
                     'WSmax': ws_max,  # 最大瞬間風速
@@ -560,12 +605,16 @@ class DataPipeline():
             map(partial(requests_params, st=start_date, et=end_date), station_list))
 
         # 使用多線程爬蟲與初步處理資料
-        data_list = self.__multi_thread_task(
+        original_data_list = self.__multi_thread_task(
             web_requests_post, requests_list, desc='歷史觀測資料爬取進度')
+
+        # 移除空缺元素
+        data_list = [item for item in original_data_list if item != None]
 
         # 使用多線程處理資料
         data_bunchs = self.__multi_thread_task(
-            extract_history_obs, data_list, desc='資料整理進度')
+            transform_history_obs, data_list, desc='資料整理進度')
+
         # 將多個list合併為一串列
         data = [element for item in data_bunchs for element in item]
 
@@ -590,9 +639,12 @@ class DataPipeline():
             et = arrow.now().shift(days=-1).floor("day")
             et = str(et).replace("+08:00", "")
 
-            # 更新所有資料
+            # 若最新資料日期不是昨日，則更新
+            if st != et:
+                self.crawler_history_obs(st, et)
+
+            # 更新即時資料
             self.crawler_realtime_obs()
-            self.crawler_history_obs(st, et)
 
         # 初始化
         except:

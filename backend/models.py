@@ -56,3 +56,7 @@ class StationList(Base):
     lat = Column(Float)
     county = Column(Text)
     addr = Column(Text)
+    start_date = Column(Text)
+    end_date = Column(Text)
+    remark = Column(Text)
+    state = Column(Integer)
