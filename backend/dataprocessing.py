@@ -1,4 +1,5 @@
 import logging
+from typing import Dict, List
 from tqdm import tqdm
 from sqlalchemy import create_engine, text
 from sqlalchemy.dialects import sqlite
@@ -29,7 +30,7 @@ class SQLOperate:
         DATABASE_URL = f"sqlite:///data/weather.db"
         self.sqlite_engine = create_engine(DATABASE_URL)
 
-    # 查詢資料
+    # 查詢資料：輸入SQL語法、回傳List of Dict
     def query(self, syntax):
         with Session(self.sqlite_engine) as session:
             result = session.execute(text(syntax))
@@ -40,7 +41,7 @@ class SQLOperate:
 
         return query_result
 
-    # 查詢資料(API)
+    # 查詢資料(API)：藉由已建構好的SQL語法，輸入查詢條件、回傳List of Dict
     def api_query(self, syntax, syntax_params_dict):
         with Session(self.sqlite_engine) as session:
             query_result = session.execute(text(syntax), syntax_params_dict)
@@ -59,7 +60,7 @@ class SQLOperate:
             table_name = syntax.split('"')[1]
             print(f'資料表 {table_name} 建立成功！')
 
-    # 新增或更新資料
+    # 新增或更新資料：輸入要插入的表模型、待寫入資料(List of Dict)、批次寫入筆數
     def upsert(self, table, data, batch_size=1000):
         # 取得資料表名稱
         tablename = table.__tablename__
@@ -106,6 +107,8 @@ class DataPipeline:
     def __init__(self) -> None:
         self.sql_operate = SQLOperate()
 
+        self.sleep_times = 0  # 爬蟲速度控制切換
+
         # 讀取授權碼
         config = configparser.ConfigParser()
         config.read('config.ini')
@@ -121,9 +124,19 @@ class DataPipeline:
         self.session.keep_alive = False
 
     # 暫停
-    def __pause(self, min_sec=0.5, max_sec=5):
-        t = random.uniform(min_sec, max_sec)
-        time.sleep(t)
+    def __pause(self):
+
+        if self.sleep_times % 2 == 0:
+            t = random.uniform(2, 6)
+            time.sleep(t)
+        else:
+            t = random.uniform(0.01, 4)
+            time.sleep(t)
+
+        if self.sleep_times == 20:
+            self.sleep_times = 0
+
+        self.sleep_times += 1
 
     """
     # 多工處理：使用多線程處理資料
@@ -162,16 +175,16 @@ class DataPipeline:
     def __web_requests_get(self, url, headers=None, params=None):
 
         try:
-            self.__pause(min_sec=0.05)
+            self.__pause()
             response = self.session.get(
                 url, headers=headers, params=params, timeout=5)
         except:
-            self.__pause(min_sec=0.5)
+            self.__pause()
             response = self.session.get(
                 url, headers=headers, params=params, timeout=5)
         finally:
             while response.status_code != requests.codes.ok:
-                self.__pause(min_sec=1)
+                self.__pause()
                 response = self.session.get(
                     url, headers=headers, params=params, timeout=5)
 
@@ -263,7 +276,7 @@ class DataPipeline:
         self.sql_operate.upsert(StationList, station_list)
 
     # 建立即時觀測資料表
-    def build_realtime_obs(self):
+    def build_realtime_obs_table(self):
         syntax = """
             CREATE TABLE IF NOT EXISTS "data_realtime" (
                 "sID"	TEXT, -- 測站代碼
@@ -316,17 +329,22 @@ class DataPipeline:
 
             weather_element = item['WeatherElement']
 
+            # 轉換時間格式
+            obs_time = datetime.datetime.strptime(
+                item['ObsTime']['DateTime'], "%Y-%m-%dT%H:%M:%S%z").timestamp()
+            obs_time = int(obs_time)
+
             # 整理降雨資料
             rainfall = weather_element['Now']['Precipitation']
             if type(rainfall) != float:
                 rainfall = 0.05
             elif rainfall < 0:
-                rainfall = 0
+                rainfall = None
 
-            # 轉換時間格式
-            obs_time = datetime.datetime.strptime(
-                item['ObsTime']['DateTime'], "%Y-%m-%dT%H:%M:%S%z").timestamp()
-            obs_time = int(obs_time)
+            # 整理紫外線資料：測站未提供此資料，則為None；儀器故障的部分改為None
+            uvi = weather_element['UVIndex']
+            if uvi == None or uvi < 0:
+                uvi = None
 
             return {
                 'sID': item['StationId'],
@@ -337,7 +355,7 @@ class DataPipeline:
                 'WS': weather_element['WindSpeed'],
                 'Temperature': weather_element['AirTemperature'],
                 'RH': weather_element['RelativeHumidity'],
-                'UVI': weather_element['UVIndex']
+                'UVI': uvi
             }
         # 使用多線程處理資料
         process_result = self.__multi_thread_task(
@@ -347,7 +365,7 @@ class DataPipeline:
         self.sql_operate.upsert(DataRealtime, process_result)
 
     # 建立歷史觀測資料表
-    def build_history_obs(self):
+    def build_historical_obs_table(self):
         syntax = """
             CREATE TABLE IF NOT EXISTS "data_history" (
                 "sID"	TEXT, -- 測站代碼
@@ -377,7 +395,7 @@ class DataPipeline:
         self.sql_operate.create_table(syntax)
 
     # 爬取、並整理和寫入所有測站歷史觀測資料
-    def etl_history_obs(self, start_date, end_date):
+    def etl_historical_obs(self, start_date, end_date):
         # 撈取觀測站清單
         syntax = """SELECT sID, stn_name FROM station_list"""
         # syntax = """
@@ -448,27 +466,27 @@ class DataPipeline:
             url = f'https://codis.cwa.gov.tw/api/station?'
 
             try:
-                self.__pause(min_sec=0.75)
+                self.__pause()
                 response = self.session.post(
                     url, headers=headers, data=payload, timeout=5)
 
-            except requests.exceptions.Timeout:
-                self.__pause(min_sec=1.5)
+            except:
+                self.__pause()
                 response = self.session.post(
                     url, headers=headers, data=payload, timeout=5)
 
             finally:
                 if 'response' in locals():
                     while response.status_code != response.json()['code']:
-                        self.__pause(min_sec=2)
+                        self.__pause()
                         response = self.session.post(
                             url, headers=headers, data=payload, timeout=5)
                 else:
-                    self.__pause(min_sec=2)
+                    self.__pause()
                     response = self.session.post(
                         url, headers=headers, data=payload, timeout=5)
                     while response.status_code != response.json()['code']:
-                        self.__pause(min_sec=2)
+                        self.__pause()
                         response = self.session.post(
                             url, headers=headers, data=payload, timeout=5)
 
@@ -483,7 +501,7 @@ class DataPipeline:
             return data
 
         # 轉換並整理資料
-        def transform_history_obs(item):
+        def transform_historical_obs(item):
             histroy_obs = []
             stn_id = item['StationID']  # 觀測站代碼
             stn_name = item['stn_name']  # 觀測站名稱
@@ -565,7 +583,7 @@ class DataPipeline:
                 # 整理最大紫外線資料：測站未提供此資料，則為None；儀器故障的部分改為None
                 uvi_max = piece['UVIndex']['Maximum']
                 if uvi_max == None or uvi_max < 0:
-                    uvi_max == None
+                    uvi_max = None
 
                 # 整理總雲量資料：因濃霧無法觀察，定義為11
                 cloud_amount = piece['TotalCloudAmount']['Mean']
@@ -613,7 +631,7 @@ class DataPipeline:
 
         # 使用多線程處理資料
         data_bunchs = self.__multi_thread_task(
-            transform_history_obs, data_list, desc='資料整理進度')
+            transform_historical_obs, data_list, desc='資料整理進度')
 
         # 將多個list合併為一串列
         data = [element for item in data_bunchs for element in item]
