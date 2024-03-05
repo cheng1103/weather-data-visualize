@@ -26,7 +26,7 @@ async def station_list():
 
 @app.get("/realtime")
 # 回傳觀測資料
-async def weather_data_realtime():
+async def weather_realtime_data():
     syntax = """
         SELECT s.sID, s.stn_name, s.alt, s.lon, s.lat, r.obs_time, r.Precp, r.WD, r.WS, r.Temperature, r.RH, r.UVI
         FROM station_list s JOIN data_realtime r
@@ -46,7 +46,7 @@ async def weather_realtime_data_refresh():
 
 @app.get("/history")
 # 回傳單一測站之歷史資料
-async def weather_data_history(stn: str, start: int, end: int):
+async def weather_historical_data(stn: str, start_date: int, end_date: int):
     syntax = """
         SELECT obs_date, Precp, WS, WSmax, Temperature, RH, UVImax
         FROM data_history
@@ -55,8 +55,8 @@ async def weather_data_history(stn: str, start: int, end: int):
     """
     syntax_params = {
         'stn': stn,
-        'start': start,
-        'end': end,
+        'start': start_date,
+        'end': end_date,
     }
     data = sql_operate.api_query(syntax, syntax_params)
     return {"data": data}
@@ -64,7 +64,7 @@ async def weather_data_history(stn: str, start: int, end: int):
 
 @app.get("/history_multi")
 # 回傳多個測站之歷史資料
-async def weather_data_history(stns: str, start: int, end: int):
+async def weather_historical_data(stns: str, start: int, end: int):
     syntax = """
         SELECT obs_date, Precp, WD, WS, Temperature, RH, UVImax
         FROM data_history
