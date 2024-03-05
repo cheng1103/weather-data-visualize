@@ -1,5 +1,4 @@
-import logging
-from typing import Dict, List
+import os
 from tqdm import tqdm
 from sqlalchemy import create_engine, text
 from sqlalchemy.dialects import sqlite
@@ -12,11 +11,9 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from urllib import parse
 from fake_useragent import UserAgent
-from lxml import etree
 import configparser
 import datetime
 import arrow
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
@@ -112,7 +109,9 @@ class DataPipeline:
         # 讀取授權碼
         config = configparser.ConfigParser()
         config.read('config.ini')
-        self.cwa_authorization = config['cwa']['authorization']
+        # self.cwa_authorization = config['cwa']['authorization']   # 使用config讀取
+        self.cwa_authorization = os.environ.get(
+            "CWA_authorization")    # 直接讀取環境變數
 
         # 初始化連線物件
         self.session = requests.Session()
