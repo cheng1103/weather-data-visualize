@@ -22,16 +22,16 @@
 .
 +-- assets      # 包含 gif、png 等素材圖檔
 +-- backend
-|   +-- api.py # 
-|   +-- database.py # 
-|   +-- models.py #  
-|   +-- # 
+|   +-- main.py # FastAPI的主程式
+|   +-- dataprocessing.py   # 資料庫操作和資料處理管線
+|   +-- models.py	# 資料表模型
+|   
 |
 +-- frontend
-|   +-- # 
+|   +-- main    # 主頁面
 |   +-- pages 
-|       +-- #  
-|       +-- #
+|       +-- history.py  # 歷史資料頁面  
+|       +-- realtime.py # 即時資料頁面
 |
 +-- data
 |   +-- weather.db # 氣象資料庫
@@ -40,9 +40,9 @@
 +-- #
 +-- #
 +-- #
-+-- requirements.txt  # 相依套件
++-- requirements.txt	# 相依套件
 +-- example_config.ini  # 設定檔範例
-+-- README.md  # 說明文件
++-- README.md	# 說明文件
 ```
 [⏫回大綱](#大綱)
 
