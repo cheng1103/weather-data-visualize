@@ -111,7 +111,7 @@ class DataPipeline:
         config.read('config.ini')
         # self.cwa_authorization = config['cwa']['authorization']   # 使用config讀取
         self.cwa_authorization = os.environ.get(
-            "CWA_authorization")    # 直接讀取環境變數
+            "CWA_AUTHORIZATION")    # 直接讀取環境變數
 
         # 初始化連線物件
         self.session = requests.Session()
