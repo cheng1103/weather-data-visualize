@@ -106,12 +106,13 @@ class DataPipeline:
 
         self.sleep_times = 0  # 爬蟲速度控制切換
 
-        # 讀取授權碼
-        config = configparser.ConfigParser()
-        config.read('config.ini')
-        # self.cwa_authorization = config['cwa']['authorization']   # 使用config讀取
+        # 使用config讀取授權碼
+        # config = configparser.ConfigParser()
+        # config.read('config.ini')
+        # self.cwa_authorization = config['cwa']['authorization']
+        # 直接讀取環境變數
         self.cwa_authorization = os.environ.get(
-            "CWA_AUTHORIZATION")    # 直接讀取環境變數
+            "CWA_AUTHORIZATION")
 
         # 初始化連線物件
         self.session = requests.Session()
@@ -212,7 +213,7 @@ class DataPipeline:
         self.sql_operate.create_table(syntax)
 
     # 更新現有觀測站清單
-    def refresh_station_list(self):
+    def update_station_list(self):
         # 建構請求資料
         url = 'https://codis.cwa.gov.tw/api/station_list'
         useragent = UserAgent().random
@@ -396,12 +397,12 @@ class DataPipeline:
     # 爬取、並整理和寫入所有測站歷史觀測資料
     def etl_historical_obs(self, start_date, end_date):
         # 撈取觀測站清單
-        syntax = """SELECT sID, stn_name FROM station_list"""
-        # syntax = """
-        #     SELECT sID, stn_name
-        #     FROM station_list
-        #     WHERE state = 1
-        # """
+        # syntax = """SELECT sID, stn_name FROM station_list"""
+        syntax = """
+            SELECT sID, stn_name
+            FROM station_list
+            WHERE state = 1
+        """
         station_list = self.sql_operate.query(syntax)
 
         # 建立觀測站代碼轉換表
@@ -642,36 +643,8 @@ class DataPipeline:
         # 寫入資料庫
         self.sql_operate.upsert(DataHistory, data)
 
-    # 初始化或更新資料庫
-    def init_refresh_db(self):
-        # 更新
-        try:
-            # 取得資料庫最新資料的日期
-            syntax = """SELECT obs_date FROM data_history ORDER BY obs_date DESC LIMIT 1"""
-            st = self.sql_operate.query(syntax)[0]['obs_date']
-            st = datetime.datetime.fromtimestamp(
-                st).strftime('%Y-%m-%dT%H:%M:%S')
-
-            # 取得前一日時間
-            et = arrow.now().shift(days=-1).floor("day")
-            et = str(et).replace("+08:00", "")
-
-            # 若最新資料日期不是昨日，則更新
-            if st != et:
-                self.crawler_history_obs(st, et)
-
-            # 更新即時資料
-            self.crawler_realtime_obs()
-
-        # 初始化
-        except:
-            et = arrow.now().shift(days=-1).floor("day")  # 取得前一日時間
-            st = et.shift(days=-366).floor("day")  # 取得一年前時間
-            et = str(et).replace("+08:00", "")
-            st = str(st).replace("+08:00", "")
-
-            self.build_station_list()
-            self.build_realtime_obs()
-            self.crawler_realtime_obs()
-            self.build_history_obs()
-            self.crawler_history_obs(st, et)
+    # 更新歷史資料
+    def update_historical_data(self):
+        st = arrow.now().floor("month")
+        et = arrow.now().ceil("month").floor("day")
+        self.etl_historical_obs(st, et)
