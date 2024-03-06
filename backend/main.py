@@ -10,7 +10,7 @@ app = FastAPI()  # 建立一個 Fast API application
 @app.get("/")
 # 根目錄
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Hi! Here is the backend for meteorological observation data."}
 
 
 @app.get("/stations")
@@ -39,8 +39,15 @@ async def weather_realtime_data():
 
 @app.put("/realtime")
 # 更新目前觀測資料
-async def weather_realtime_data_refresh():
+async def weather_realtime_data_update():
     data_pipeline.etl_realtime_obs()
+    return {"message": "Refresh successful!"}
+
+
+@app.head("/history")
+# 更新歷史觀測資料
+async def weather_historical_data_update():
+    data_pipeline.update_historical_data()
     return {"message": "Refresh successful!"}
 
 
@@ -62,19 +69,19 @@ async def weather_historical_data(stn: str, start_date: int, end_date: int):
     return {"data": data}
 
 
-@app.get("/history_multi")
-# 回傳多個測站之歷史資料
-async def weather_historical_data(stns: str, start: int, end: int):
-    syntax = """
-        SELECT obs_date, Precp, WD, WS, Temperature, RH, UVImax
-        FROM data_history
-        WHERE sID IN :stns
-        AND obs_date BETWEEN :start AND :end
-    """
-    syntax_params = {
-        'stns': stns,
-        'start': start,
-        'end': end,
-    }
-    data = sql_operate.api_query(syntax, syntax_params)
-    return {"data": data}
+# @app.get("/history_multi")
+# # 回傳多個測站之歷史資料
+# async def weather_historical_data(stns: str, start: int, end: int):
+#     syntax = """
+#         SELECT obs_date, Precp, WD, WS, Temperature, RH, UVImax
+#         FROM data_history
+#         WHERE sID IN :stns
+#         AND obs_date BETWEEN :start AND :end
+#     """
+#     syntax_params = {
+#         'stns': stns,
+#         'start': start,
+#         'end': end,
+#     }
+#     data = sql_operate.api_query(syntax, syntax_params)
+#     return {"data": data}
