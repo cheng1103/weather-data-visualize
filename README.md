@@ -14,6 +14,7 @@
 
 ## 開始使用
 
+
 [⏫回大綱](#大綱)
 
 
@@ -36,10 +37,6 @@
 +-- data
 |   +-- weather.db # 氣象資料庫
 |
-|
-+-- #
-+-- #
-+-- #
 +-- requirements.txt	# 相依套件
 +-- example_config.ini  # 設定檔範例
 +-- README.md	# 說明文件
@@ -61,6 +58,23 @@
 ![cwa opendata authorization](assets/cwa_opendata_authorization.png)
 3. 將 __example_config.ini__ 中的 __your_cwa_authorization__ ，取代為您的授權碼
 4. 再把「 __example_config.ini__ 」的檔名，修改為 「 __config.ini__ 」
+### 本地端執行
+1. 移至 __config讀取授權碼__ 的註解處，將以下程式碼 __移除註解__：
+```shell
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    self.cwa_authorization = config['cwa']['authorization']
+```
+2. 接著為以下程式 __加入註解__：
+```shell
+    self.cwa_authorization = os.environ.get("CWA_AUTHORIZATION")
+```
+3. 最後在命令列中下達指令：`python main.py` ，即可在本機上操作！
+### Render部署
+1. 進入 Render 頁面，點選右上角 __「New」__ 的 __「Web Service」__，接著在 __「Public Git repository」__ 中貼上本專案的[網址](https://github.com/cheng1103/weather-data-visualize)，然後點選 __Continue__
+2. 在 __「Name」__ 填入自訂名稱(同時是網站名稱)，還有在 __「Start Command」__ 填入`python main.py`
+3. 接著在 __「Environment Variables」__ 填入環境變數名稱： __CWA_AUTHORIZATION__ ，以及你的 __氣象資料開放平台授權碼__ (重要)
+4. 最後點選 __「Create Web Service」__ ，即可完成部署了！
 
 [⏫回大綱](#大綱)
 
