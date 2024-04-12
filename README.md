@@ -1,9 +1,12 @@
 # Weather data visualize 氣象資料視覺化
 ![Static Badge](https://img.shields.io/badge/Python-3.8.10-blue)
+![Static Badge](https://img.shields.io/badge/FastAPI-0.109.0-green)
+![Static Badge](https://img.shields.io/badge/Streamlit-1.30.0-red)
 
 ## 大綱
+- [使用限制](#使用限制)
 - [開始使用](#開始使用)
-- [功能](#功能)
+- [功能簡介](#功能簡介)
 - [操作示範](#操作示範)
 - [專案目錄](#專案目錄)
 - [執行環境要求](#執行環境要求)
@@ -11,9 +14,21 @@
 - [資料來源](#資料來源)
 - [參考資料](#參考資料)
 
+## 使用限制
+__《！！重要！！》本專案是部署在免費版的Render上，每當超過15分鐘無任何人使用時，會進入休眠狀態，喚醒時需等待2~3分鐘，接著即可正常使用。__
+
+[⏫回大綱](#大綱)
+
 
 ## 開始使用
+掃描以下QRcode，或是 __[點擊我](https://weather-data-visualize.onrender.com/)__ 開啟網頁
 
+![QRcode](assets/qrcode.png)
+
+[⏫回大綱](#大綱)
+
+
+## 操作示範
 
 [⏫回大綱](#大綱)
 
@@ -101,8 +116,8 @@
 11. [Learn Code With Mike - [Python爬蟲教學]善用多執行緒(Multithreading)提升Python網頁爬蟲的執行效率](https://www.learncodewithmike.com/2020/11/multithreading-with-python-web-scraping.html)
 12. [Streamlit • A faster way to build and share data apps](https://streamlit.io/)
 13. [TEJ API 遇上STREAMLIT App](https://www.tejwin.com/insight/tej-api-%E9%81%87%E4%B8%8Astreamlit-app/)
-13. [Streamlit🔥+ FastAPI⚡️- The ingredients you need for your next Data Science Recipe](https://medium.com/codex/streamlit-fastapi-%EF%B8%8F-the-ingredients-you-need-for-your-next-data-science-recipe-ffbeb5f76a92)
-14. [Vega-Lite – A Grammar of Interactive Graphics](https://vega.github.io/vega-lite/)
+14. [Streamlit🔥+ FastAPI⚡️- The ingredients you need for your next Data Science Recipe](https://medium.com/codex/streamlit-fastapi-%EF%B8%8F-the-ingredients-you-need-for-your-next-data-science-recipe-ffbeb5f76a92)
+15. [Vega-Lite – A Grammar of Interactive Graphics](https://vega.github.io/vega-lite/)
 
 
 [⏫回大綱](#大綱)
