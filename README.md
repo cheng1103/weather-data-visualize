@@ -3,6 +3,22 @@
 ![Static Badge](https://img.shields.io/badge/FastAPI-0.109.0-green)
 ![Static Badge](https://img.shields.io/badge/Streamlit-1.30.0-red)
 
+<p align=center>
+    <img src="assets/logo.jpg" width="60%">
+</p>
+
+本專案是藉由氣象署所提供的公開資料，透過資料視覺化，展示氣象的長期趨勢，以及使用地圖掌握即時天氣概況。
+
+- 專案架構
+ 1. 前端頁面：[Streamlit](https://github.com/streamlit/streamlit)(由Python構成)
+ 2. 後端架構：**FastAPI**、**SQLalchemy**
+ 3. 資料庫：**SQLite**。
+
+- 使用的技術
+ 1. 爬蟲：加入反爬蟲機制，例如User-Agent/延遲時間/Session，提高爬取成功率。
+ 2. 平行處理：提高爬蟲速度、縮短資料整理時間。
+ 3. 防止SQL注入攻擊：避免資料庫遭到惡意攻擊，而使資料庫被清空。
+
 ## 大綱
 - [使用限制](#使用限制)
 - [開始使用](#開始使用)
@@ -29,7 +45,7 @@
 
 
 ## 功能簡介
-* 📈 天氣歷史變化圖：資料期間為 1990/01/01 ~ 2024/04/11 ，測站明細請參考[網址](https://e-service.cwa.gov.tw/wdps/obs/state.htm)。**站種** 僅涵蓋署屬有人站，包含現存測站、已撤銷測站，不包含雷達站。觀測項目則有溫度、降雨量、相對濕度、風速等要素。
+* 📈 歷史變化圖：資料期間為 **1990/01/01 ~ 2024/04/11** ，測站明細請參考[網址](https://e-service.cwa.gov.tw/wdps/obs/state.htm)。**站種** 僅涵蓋署屬有人站，包含現存測站、已撤銷測站，不包含雷達站。觀測項目則有溫度、降雨量、相對濕度、風速等要素。
 * ⚡ 即時天氣：**目前仍在開發中，資料僅供參考。** 提供氣溫和降雨量分布圖，測站則為署屬有人站，不包含雷達站。
 
 
@@ -37,6 +53,13 @@
 
 
 ## 操作示範
+* 歷史變化圖
+
+![History demo](assets/demo_history.gif)
+
+* 即時天氣圖
+
+![Realtime demo](assets/demo_realtime.gif)
 
 [⏫回大綱](#大綱)
 
@@ -68,8 +91,8 @@
 
 
 ## 執行環境要求
-* 硬體最低要求：CPU至少要有 4個執行緒
-* 套件要求詳見 [requirements.txt](requirements.txt)
+* 硬體最低要求：CPU至少要有**4個執行緒**
+* 套件要求詳見[requirements.txt](requirements.txt)
 
 [⏫回大綱](#大綱)
 
