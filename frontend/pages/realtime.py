@@ -32,17 +32,18 @@ with st.sidebar:
 # 主頁面部分
 st.title('即時天氣圖資')  # 網頁標題
 
-data = get_realtime_data()
-
-st.write('資料時間：', str(data['obs_time'][0]))  # 無法更新資料時間
-
-if st.button('更新資料'):  # 更新按鈕
-    with st.status("資料更新中……") as status:  # 顯示更新狀態
+# 更新按鈕
+if st.button('更新資料'):
+    # 顯示更新狀態
+    with st.status("資料更新中……") as status:
         requests.put('http://localhost:8000/realtime')
         st.write("資料更新中……")
         status.update(label="更新完成！", state="complete")
         st.write("更新完成！")
-        # data = get_realtime_data()
+        data = get_realtime_data()
+
+data = get_realtime_data()
+st.write('資料時間：', str(data['obs_time'][0]))  # 無法更新資料時間
 
 # 頁面標籤切換
 temperature, rainfall = st.tabs(["氣溫", "雨量"])
@@ -71,7 +72,7 @@ with temperature:
                   radius=100,
                   auto_highlight=True,
                   pickable=True,
-                  get_fill_color=color_scheme,
+                  #   get_fill_color=color_scheme,
                   coverage=1),
     ]
 
@@ -109,10 +110,16 @@ with rainfall:
                   coverage=2),
     ]
 
+    tooltip = {
+        "html": "觀測站： <b>{stn_name}</b></br>降雨量： <b>{Precp}</b> mm",
+        "style": {"background": "grey", "color": "white", "font-family": '"Helvetica Neue", Arial', "z-index": "10000"},
+    }
+
     st.pydeck_chart(
         pdk.Deck(
             map_style=None,
             initial_view_state=view_state,
-            layers=layer
+            layers=layer,
+            tooltip=tooltip,
         )
     )
