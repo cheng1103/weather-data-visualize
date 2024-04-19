@@ -10,9 +10,9 @@
 本專案是藉由氣象署所提供的公開資料，透過資料視覺化，展示氣象的長期趨勢，以及使用地圖掌握即時天氣概況。
 
 - 專案架構
- 1. 前端頁面：[Streamlit](https://github.com/streamlit/streamlit)(由Python構成)
- 2. 後端架構：**FastAPI**、**SQLalchemy**
- 3. 資料庫：**SQLite**。
+ 1. 前端介面：[Streamlit](https://streamlit.io/ "Streamlit - A faster way to build and share data apps")(由Python構成)
+ 2. 後端架構：**FastAPI**、**SQLAlchemy**
+ 3. 資料庫：**SQLite**
 
 - 使用的技術
  1. 爬蟲：加入反爬蟲機制，例如User-Agent/延遲時間/Session，提高爬取成功率。
@@ -37,7 +37,7 @@
 
 
 ## 開始使用
-掃描以下QRcode，或是[點擊我](https://weather-data-visualize.onrender.com/)開啟網頁
+掃描以下QRcode，或是[點擊我](https://weather-data-visualize.onrender.com/ '氣象資料視覺化')開啟網頁
 
 ![QRcode](assets/qrcode.png)
 
@@ -99,8 +99,8 @@
 
 ## 安裝與執行
 ### 申請氣象資料開放平台授權碼 （若已申請，可忽略此步驟）
-1. 請至中央氣象署填寫資料[加入會員](https://pweb.cwa.gov.tw/emember/register/authorization)
-2. [登入會員](https://opendata.cwa.gov.tw/userLogin)後，[進入頁面](https://opendata.cwa.gov.tw/user/authkey)，點擊「__取得授權碼__」。
+1. 請至中央氣象署填寫資料[加入會員](https://pweb.cwa.gov.tw/emember/register/authorization '中央氣象署會員申請')
+2. [登入會員](https://opendata.cwa.gov.tw/userLogin '氣象資料開放平台 - 會員登入')後，[進入頁面](https://opendata.cwa.gov.tw/user/authkey '氣象資料開放平台 - API授權碼')，點擊「__取得授權碼__」。
 ![cwa opendata authorization](assets/cwa_opendata_authorization.png)
 3. 將 __example_config.ini__ 中的 __your_cwa_authorization__ ，取代為您的授權碼
 4. 再把「 __example_config.ini__ 」的檔名，修改為 「 __config.ini__ 」
@@ -117,7 +117,7 @@
 ```
 3. 最後在命令列中下達指令：`python main.py` ，即可在本機上操作！
 ### Render部署
-1. 進入 Render 頁面，點選右上角 __「New」__ 的 __「Web Service」__，接著在 __「Public Git repository」__ 中貼上本專案的[網址](https://github.com/cheng1103/weather-data-visualize)，然後點選 __Continue__
+1. 進入 [Render](https://render.com/)的 **Dashboard**頁面，點選右上角 **「New」** 中的 __「Web Service」__，接著在 __「Public Git repository」__ 中貼上本專案的[網址](https://github.com/cheng1103/weather-data-visualize)，然後點選 __Continue__
 2. 在 __「Name」__ 填入自訂名稱(同時是網站名稱)，還有在 __「Start Command」__ 填入`python main.py`
 3. 接著在 __「Environment Variables」__ 填入環境變數名稱： __CWA_AUTHORIZATION__ ，以及你的 __氣象資料開放平台授權碼__ (重要)
 4. 最後點選 __「Create Web Service」__ ，即可完成部署了！
